@@ -14,8 +14,17 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import ovh.gabrielhuav.flasklogin.data.exception.NetworkException
 import ovh.gabrielhuav.flasklogin.data.repository.AuthRepository
 import ovh.gabrielhuav.flasklogin.ui.theme.FlaskLoginTheme
+
+/** Returns a user-friendly error message, distinguishing network errors from other failures. */
+private fun networkErrorMessage(error: Throwable, fallback: String): String = when (error) {
+    is NetworkException.ConnectionException -> "🌐 ${error.message}"
+    is NetworkException.TimeoutException -> "⏱️ ${error.message}"
+    is NetworkException -> error.message ?: "Error de red"
+    else -> error.message ?: fallback
+}
 
 sealed class Screen {
     object Login : Screen()
@@ -135,8 +144,8 @@ fun LoginScreen(
 
                         result.onSuccess {
                             onShowToast("✅ ${it.message}")
-                        }.onFailure {
-                            onShowToast("❌ ${it.message}")
+                        }.onFailure { error ->
+                            onShowToast("❌ ${networkErrorMessage(error, "Error al registrar")}")
                         }
                     }
                 },
@@ -157,8 +166,8 @@ fun LoginScreen(
                         result.onSuccess { response ->
                             val loggedUsername = response.username ?: username
                             onLoginSuccess(loggedUsername)
-                        }.onFailure {
-                            errorMessage = it.message ?: "Error al iniciar sesión"
+                        }.onFailure { error ->
+                            errorMessage = networkErrorMessage(error, "Error al iniciar sesión")
                         }
                     }
                 },

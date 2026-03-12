@@ -1,15 +1,29 @@
 package ovh.gabrielhuav.flasklogin.data.repository
 
 import ovh.gabrielhuav.flasklogin.data.api.RetrofitClient
+import ovh.gabrielhuav.flasklogin.data.exception.NetworkException
 import ovh.gabrielhuav.flasklogin.data.model.LoginRequest
 import ovh.gabrielhuav.flasklogin.data.model.LoginResponse
 import ovh.gabrielhuav.flasklogin.data.model.RegisterRequest
 import ovh.gabrielhuav.flasklogin.data.model.RegisterResponse
-import retrofit2.Response
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 class AuthRepository {
 
     private val apiService = RetrofitClient.authApiService
+
+    /** Convierte excepciones de bajo nivel en [NetworkException] con mensajes amigables. */
+    private fun Exception.toNetworkException(): NetworkException = when (this) {
+        is NetworkException -> this
+        is SocketTimeoutException -> NetworkException.TimeoutException()
+        is ConnectException, is UnknownHostException ->
+            NetworkException.ConnectionException()
+        else -> NetworkException.UnknownNetworkException(
+            message ?: "Error de red desconocido. Intenta de nuevo."
+        )
+    }
 
     suspend fun checkApi(): Result<String> {
         return try {
@@ -18,10 +32,12 @@ class AuthRepository {
                 val message = response.body()?.get("message") ?: "API funcionando"
                 Result.success(message)
             } else {
-                Result.failure(Exception("Error: ${response.code()}"))
+                Result.failure(
+                    NetworkException.HttpException(response.code(), "Error: ${response.code()}")
+                )
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(e.toNetworkException())
         }
     }
 
@@ -35,15 +51,14 @@ class AuthRepository {
                     Result.success(it)
                 } ?: Result.failure(Exception("Respuesta vacía"))
             } else {
-                // Manejar errores HTTP (400, 401, etc.)
                 val errorMsg = when (response.code()) {
                     400 -> "El usuario ya existe"
                     else -> "Error al registrar: ${response.code()}"
                 }
-                Result.failure(Exception(errorMsg))
+                Result.failure(NetworkException.HttpException(response.code(), errorMsg))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(e.toNetworkException())
         }
     }
 
@@ -65,10 +80,10 @@ class AuthRepository {
                     401 -> "Credenciales inválidas"
                     else -> "Error al iniciar sesión: ${response.code()}"
                 }
-                Result.failure(Exception(errorMsg))
+                Result.failure(NetworkException.HttpException(response.code(), errorMsg))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(e.toNetworkException())
         }
     }
 }
