@@ -11,10 +11,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ovh.gabrielhuav.flasklogin.data.repository.AuthRepository
 import ovh.gabrielhuav.flasklogin.ui.theme.FlaskLoginTheme
+
+sealed class Screen {
+    object Login : Screen()
+    data class Welcome(val username: String) : Screen()
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,13 +28,27 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FlaskLoginTheme {
+                var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    LoginScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        onShowToast = { message ->
-                            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                    when (val screen = currentScreen) {
+                        is Screen.Login -> LoginScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            onShowToast = { message ->
+                                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                            },
+                            onLoginSuccess = { username ->
+                                currentScreen = Screen.Welcome(username)
+                            }
+                        )
+                        is Screen.Welcome -> WelcomeScreen(
+                            username = screen.username,
+                            modifier = Modifier.padding(innerPadding),
+                            onLogout = {
+                                currentScreen = Screen.Login
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -38,11 +58,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LoginScreen(
     modifier: Modifier = Modifier,
-    onShowToast: (String) -> Unit
+    onShowToast: (String) -> Unit,
+    onLoginSuccess: (String) -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val repository = remember { AuthRepository() }
     val scope = rememberCoroutineScope()
@@ -62,22 +84,40 @@ fun LoginScreen(
 
         OutlinedTextField(
             value = username,
-            onValueChange = { username = it },
+            onValueChange = {
+                username = it
+                errorMessage = null
+            },
             label = { Text("Usuario") },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
+            enabled = !isLoading,
+            isError = errorMessage != null
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = {
+                password = it
+                errorMessage = null
+            },
             label = { Text("Contraseña") },
             modifier = Modifier.fillMaxWidth(),
             visualTransformation = PasswordVisualTransformation(),
-            enabled = !isLoading
+            enabled = !isLoading,
+            isError = errorMessage != null
         )
+
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = errorMessage.orEmpty(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -89,6 +129,7 @@ fun LoginScreen(
                 onClick = {
                     scope.launch {
                         isLoading = true
+                        errorMessage = null
                         val result = repository.register(username, password)
                         isLoading = false
 
@@ -109,20 +150,22 @@ fun LoginScreen(
                 onClick = {
                     scope.launch {
                         isLoading = true
+                        errorMessage = null
                         val result = repository.login(username, password)
                         isLoading = false
 
-                        result.onSuccess {
-                            onShowToast("✅ ${it.message} - User ID: ${it.userId}")
+                        result.onSuccess { response ->
+                            val loggedUsername = response.username ?: username
+                            onLoginSuccess(loggedUsername)
                         }.onFailure {
-                            onShowToast("❌ ${it.message}")
+                            errorMessage = it.message ?: "Error al iniciar sesión"
                         }
                     }
                 },
                 modifier = Modifier.weight(1f),
                 enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
             ) {
-                Text("Login")
+                Text("Iniciar Sesión")
             }
         }
 
@@ -149,6 +192,50 @@ fun LoginScreen(
             )
         ) {
             Text("Probar Conexión API")
+        }
+    }
+}
+
+@Composable
+fun WelcomeScreen(
+    username: String,
+    modifier: Modifier = Modifier,
+    onLogout: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "¡Bienvenido!",
+            style = MaterialTheme.typography.headlineLarge,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        Text(
+            text = username,
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+
+        Text(
+            text = "Has iniciado sesión correctamente.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 48.dp)
+        )
+
+        Button(
+            onClick = onLogout,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Text("Cerrar Sesión")
         }
     }
 }
