@@ -1,97 +1,52 @@
-# Flask Login API + Android Client
+# Integración de API REST en Android 
 
-Este repositorio contiene dos componentes: un backend REST construido con Flask y dockerizado, y una app Android base en Kotlin para consumirlo.
+Este proyecto es una aplicación nativa de Android desarrollada para demostrar el consumo de una API REST. Implementa la conexión a un servidor local, gestión de usuarios (registro e inicio de sesión) y el manejo de excepciones de red.
 
----
 
-## Backend — `Docker-Flask/ORM/`
+## Desarrollo de Ejercicios y Entregables
 
-API REST minimalista para registro e inicio de sesión de usuarios. Usa **Flask-SQLAlchemy** para persistencia con SQLite y **Flask-Bcrypt** para hashear contraseñas. No requiere configurar una base de datos externa; el archivo `site.db` se crea automáticamente al iniciar.
+### Ejercicio 1 – Conexión y verificación de la API
+Se configuró el cliente HTTP y se realizó una petición `GET` al endpoint raíz (`/`) al iniciar la aplicación. La respuesta del servidor se muestra en un `TextView` en la pantalla principal.
 
-### Endpoints
+**Entregable:**
+> Mensaje de respuesta de la API visible en el emulador.
+*![Captura del Ejercicio 1](capturas/ejercicio1.png)*
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| `GET` | `/` | Verifica que la API está activa |
-| `POST` | `/register` | Registra un nuevo usuario |
-| `POST` | `/login` | Autentica un usuario existente |
+### Ejercicio 2 – Pantalla de Registro
+Se implementó una interfaz con campos para usuario y contraseña. Al procesar el botón de registro, se envía una petición `POST` con formato JSON al endpoint `/register`. 
 
-#### `POST /register`
+**Entregables:**
+> 1. Registro Exitoso:
+*![Captura Registro Exitoso](capturas/ejercicio2.2.jpeg)*
 
-```json
-// Request
-{ "username": "alice", "password": "secreto123" }
 
-// Response 201
-{ "message": "Usuario creado exitosamente" }
+> 2. Error por Usuario Duplicado:
+*![Captura Registro Usuario duplicado](capturas/ejercicio2.1.jpeg)*
 
-// Response 400 (usuario duplicado)
-{ "message": "El usuario ya existe" }
-```
+### Ejercicio 3 – Pantalla de Login
+Se creó la vista de inicio de sesión que envía una petición `POST` al endpoint `/login`. Cuenta con lógica de navegación mediante *Activities* o *Fragments* para redirigir al usuario según la respuesta del servidor.
 
-#### `POST /login`
+**Entregables:**
+> 1. Login Exitoso y navegación a la pantalla de bienvenida:
+*![Captura Login Exitoso](capturas/ejercicio2.jpeg)*
 
-```json
-// Request
-{ "username": "alice", "password": "secreto123" }
 
-// Response 200
-{ "status": "success", "message": "Login exitoso", "user_id": 1, "username": "alice" }
+> 2. Login Fallido (credenciales incorrectas):
+*![Captura Login Fallido](capturas/ejercicio3.jpeg)*
 
-// Response 401
-{ "status": "error", "message": "Credenciales inválidas" }
-```
+### Ejercicio 4 – Manejo de Errores de Red
+Se implementó un bloque de captura de excepciones (`try-catch` o manejadores de error del cliente HTTP) para evitar cierres abruptos de la aplicación si el servidor deja de responder. 
 
-### Levantar con Docker
+Para esta prueba, se detuvo el contenedor del backend con `docker compose down` mientras la aplicación estaba en ejecución.
 
-```bash
-cd Docker-Flask/ORM
-docker compose up --build
-```
-
-El servicio queda disponible en `http://localhost:5000`. Si modificas `app.py` mientras el contenedor está corriendo, Flask recarga automáticamente gracias al volumen montado y al modo debug.
-
-### Probar con curl
-
-```bash
-curl http://localhost:5000/
-
-curl -X POST http://localhost:5000/register \
-     -H "Content-Type: application/json" \
-     -d "{\"username\":\"android_dev\",\"password\":\"mi_password_secreto\"}"
-
-curl -X POST http://localhost:5000/login \
-     -H "Content-Type: application/json" \
-     -d "{\"username\":\"android_dev\",\"password\":\"mi_password_secreto\"}"
-```
-
-### Stack
-
-- Python 3.9 (imagen `python:3.9-slim`)
-- Flask · Flask-SQLAlchemy · Flask-Bcrypt
-- SQLite (archivo local, no requiere servicio externo)
-- Docker Compose
+**Entregable:**
+> Mensaje amigable al usuario indicando la caída de la red:
+*![Captura Error de Red](capturas/ejercicio4.jpeg)*
 
 ---
 
-## App Android — `Android/FlaskLogin/`
-
-Proyecto base generado con Android Studio usando **Kotlin** y **Jetpack Compose** (Material 3). El `MainActivity.kt` es el punto de partida; la lógica de conexión con la API queda pendiente de implementar.
-
-**Configuración:** `minSdk 24`, `targetSdk 36`.
-
-### Conectar al backend desde el emulador
-
-El emulador AVD no resuelve `localhost` de la máquina host. Usa `http://10.0.2.2:5000` en su lugar. Con un dispositivo físico en la misma red, usa la IP local de tu PC.
-
-Agrega en `AndroidManifest.xml`:
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-```
-
-Y dentro de `<application>`:
-
-```xml
-android:usesCleartextTraffic="true"
-```
+## Instrucciones de Ejecución
+1. Levantar el servidor local ejecutando `docker compose up -d` en el directorio del backend.
+2. Abrir el proyecto en Android Studio.
+3. Sincronizar los archivos de Gradle.
+4. Ejecutar la aplicación en un emulador con API 24 o superior.
