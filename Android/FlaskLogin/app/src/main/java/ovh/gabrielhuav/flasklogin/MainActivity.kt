@@ -10,21 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
-import ovh.gabrielhuav.flasklogin.data.exception.NetworkException
-import ovh.gabrielhuav.flasklogin.data.repository.AuthRepository
+import ovh.gabrielhuav.flasklogin.ui.screens.LoginScreen
 import ovh.gabrielhuav.flasklogin.ui.theme.FlaskLoginTheme
-
-/** Returns a user-friendly error message, distinguishing network errors from other failures. */
-private fun networkErrorMessage(error: Throwable, fallback: String): String = when (error) {
-    is NetworkException.ConnectionException -> "🌐 ${error.message}"
-    is NetworkException.TimeoutException -> "⏱️ ${error.message}"
-    is NetworkException -> error.message ?: "Error de red"
-    else -> error.message ?: fallback
-}
 
 sealed class Screen {
     object Login : Screen()
@@ -60,147 +49,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun LoginScreen(
-    modifier: Modifier = Modifier,
-    onShowToast: (String) -> Unit,
-    onLoginSuccess: (String) -> Unit
-) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    val repository = remember { AuthRepository() }
-    val scope = rememberCoroutineScope()
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Flask Login",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 32.dp)
-        )
-
-        OutlinedTextField(
-            value = username,
-            onValueChange = {
-                username = it
-                errorMessage = null
-            },
-            label = { Text("Usuario") },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading,
-            isError = errorMessage != null
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = {
-                password = it
-                errorMessage = null
-            },
-            label = { Text("Contraseña") },
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
-            enabled = !isLoading,
-            isError = errorMessage != null
-        )
-
-        if (errorMessage != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = errorMessage.orEmpty(),
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = {
-                    scope.launch {
-                        isLoading = true
-                        errorMessage = null
-                        val result = repository.register(username, password)
-                        isLoading = false
-
-                        result.onSuccess {
-                            onShowToast("✅ ${it.message}")
-                        }.onFailure { error ->
-                            onShowToast("❌ ${networkErrorMessage(error, "Error al registrar")}")
-                        }
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
-            ) {
-                Text("Registrar")
-            }
-
-            Button(
-                onClick = {
-                    scope.launch {
-                        isLoading = true
-                        errorMessage = null
-                        val result = repository.login(username, password)
-                        isLoading = false
-
-                        result.onSuccess { response ->
-                            val loggedUsername = response.username ?: username
-                            onLoginSuccess(loggedUsername)
-                        }.onFailure { error ->
-                            errorMessage = networkErrorMessage(error, "Error al iniciar sesión")
-                        }
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
-            ) {
-                Text("Iniciar Sesión")
-            }
-        }
-
-        if (isLoading) {
-            Spacer(modifier = Modifier.height(16.dp))
-            CircularProgressIndicator()
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = {
-                scope.launch {
-                    val result = repository.checkApi()
-                    result.onSuccess {
-                        onShowToast("API: $it")
-                    }.onFailure {
-                        onShowToast("Error: ${it.message}")
-                    }
-                }
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondary
-            )
-        ) {
-            Text("Probar Conexión API")
         }
     }
 }
